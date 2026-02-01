@@ -112,7 +112,7 @@ func isTTLLine(line string) bool {
 }
 
 func writeHeader(w io.Writer, opts Opts) error {
-	serial := time.Now().Format("200601021504")
+	serial := time.Now().Unix()
 
 	nameserver := addTrailingDot(opts.Nameserver)
 	hostmasterEmail := addTrailingDot(hostmasterEmail(opts.HostmasterEmail))
