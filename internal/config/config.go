@@ -80,5 +80,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.AlsoNotify == "" {
+		return fmt.Errorf("also_notify is required")
+	}
+
 	return nil
 }
