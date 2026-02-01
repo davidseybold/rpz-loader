@@ -8,6 +8,7 @@ type Config struct {
 	HostmasterEmail string `yaml:"hostmaster_email"`
 	RPZs            []RPZ  `yaml:"rpzs"`
 	DryRun          bool   `yaml:"dry_run"`
+	AlsoNotify      string `yaml:"also_notify"`
 }
 
 type RPZType string

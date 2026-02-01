@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -41,54 +42,9 @@ func Run(configPath string) error {
 		return err
 	}
 
-	for _, r := range cfg.RPZs {
-		zoneFile := zoneFileName(cfg.DataDir, r.Name)
-		rpzOpts := rpz.Opts{
-			Filename:        zoneFile,
-			ZoneName:        r.Name,
-			Nameserver:      cfg.Nameserver,
-			HostmasterEmail: cfg.HostmasterEmail,
-			TTL:             r.TTL,
-			Refresh:         r.Refresh,
-			Retry:           r.Retry,
-			Expire:          r.Expire,
-			NegativeTTL:     r.NegativeTTL,
-		}
-
-		if r.Type == string(config.RPZTypeStatic) {
-			_, err = s.NewJob(
-				gocron.OneTimeJob(
-					gocron.OneTimeJobStartDateTime(time.Now().Add(10*time.Second)),
-				),
-				gocron.NewTask(syncStaticRPZ, logger, rpzOpts, r.Rules, cfg.DryRun),
-				gocron.WithName(r.Name),
-			)
-			if err != nil {
-				return err
-			}
-		} else {
-			if r.FetchOnStart {
-				_, err = s.NewJob(
-					gocron.OneTimeJob(
-						gocron.OneTimeJobStartDateTime(time.Now().Add(10*time.Second)),
-					),
-					gocron.NewTask(syncZoneFromRemote, logger, rpzOpts, r.URL, cfg.DryRun),
-					gocron.WithName(r.Name),
-				)
-				if err != nil {
-					return err
-				}
-			}
-
-			_, err = s.NewJob(
-				gocron.CronJob(r.ReloadSchedule, false),
-				gocron.NewTask(syncZoneFromRemote, logger, rpzOpts, r.URL, cfg.DryRun),
-				gocron.WithName(r.Name),
-			)
-			if err != nil {
-				return err
-			}
-		}
+	err = addJobs(s, cfg, logger)
+	if err != nil {
+		return err
 	}
 
 	var g run.Group
@@ -138,50 +94,109 @@ func Run(configPath string) error {
 	return g.Run()
 }
 
-func syncZoneFromRemote(logger *slog.Logger, rpzOpts rpz.Opts, url string, dryRun bool) {
-	logger.Info("Syncing zone from remote", "zone", rpzOpts.ZoneName, "url", url)
+func addJobs(s gocron.Scheduler, cfg *config.Config, logger *slog.Logger) error {
+	for _, r := range cfg.RPZs {
+		zoneFile := zoneFileName(cfg.DataDir, r.Name)
+		rpzOpts := rpz.Opts{
+			Filename:        zoneFile,
+			ZoneName:        r.Name,
+			Nameserver:      cfg.Nameserver,
+			HostmasterEmail: cfg.HostmasterEmail,
+			TTL:             r.TTL,
+			Refresh:         r.Refresh,
+			Retry:           r.Retry,
+			Expire:          r.Expire,
+			NegativeTTL:     r.NegativeTTL,
+		}
 
-	err := rpz.FetchZoneFile(rpzOpts, url)
-	if err != nil {
-		logger.Error("Failed to fetch zone contents from remote", "zone", rpzOpts.ZoneName, "error", err)
-		return
+		if r.Type == string(config.RPZTypeStatic) {
+			_, err := s.NewJob(
+				gocron.OneTimeJob(
+					gocron.OneTimeJobStartDateTime(time.Now().Add(10*time.Second)),
+				),
+				gocron.NewTask(runSync, logger, staticFileBuilder(r.Rules), rpzOpts, cfg.AlsoNotify, cfg.DryRun),
+				gocron.WithName(r.Name),
+			)
+			if err != nil {
+				return err
+			}
+		} else {
+			if r.FetchOnStart {
+				_, err := s.NewJob(
+					gocron.OneTimeJob(
+						gocron.OneTimeJobStartDateTime(time.Now().Add(10*time.Second)),
+					),
+					gocron.NewTask(runSync, logger, remoteFileFetcher(r.URL), rpzOpts, cfg.AlsoNotify, cfg.DryRun),
+					gocron.WithName(r.Name),
+				)
+				if err != nil {
+					return err
+				}
+			}
+
+			_, err := s.NewJob(
+				gocron.CronJob(r.ReloadSchedule, false),
+				gocron.NewTask(runSync, logger, remoteFileFetcher(r.URL), rpzOpts, cfg.AlsoNotify, cfg.DryRun),
+				gocron.WithName(r.Name),
+			)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	if dryRun {
-		logger.Info("[DRY RUN] Zone synced from remote", "zone", rpzOpts.ZoneName)
-		return
-	}
-
-	err = powerdns.SyncZoneFromFile(rpzOpts.ZoneName, rpzOpts.Filename)
-	if err != nil {
-		logger.Error("Failed to sync zone from file to PowerDNS", "zone", rpzOpts.ZoneName, "error", err)
-		return
-	}
-
-	logger.Info("Zone synced from remote", "zone", rpzOpts.ZoneName)
+	return nil
 }
 
-func syncStaticRPZ(logger *slog.Logger, rpzOpts rpz.Opts, rules []config.RPZRule, dryRun bool) {
-	logger.Info("Syncing static RPZ zone", "zone", rpzOpts.ZoneName)
+type fileBuilder func(rpzOpts rpz.Opts) error
 
-	err := rpz.WriteZoneFileFromRules(rpzOpts, rules)
+func runSync(logger *slog.Logger, buildFile fileBuilder, rpzOpts rpz.Opts, alsoNotify string, dryRun bool) {
+	logger.Info("Syncing RPZ zone", "zone", rpzOpts.ZoneName)
+
+	err := buildFile(rpzOpts)
 	if err != nil {
-		logger.Error("Failed to write zone file", "zone", rpzOpts.ZoneName, "error", err)
+		logger.Error("Failed to build RPZ file", "zone", rpzOpts.ZoneName, "error", err)
 		return
 	}
 
 	if dryRun {
-		logger.Info("[DRY RUN] Static RPZ zone synced", "zone", rpzOpts.ZoneName)
+		logger.Info("[DRY RUN] RPZ zone synced", "zone", rpzOpts.ZoneName)
 		return
 	}
 
 	err = powerdns.SyncZoneFromFile(rpzOpts.ZoneName, rpzOpts.Filename)
 	if err != nil {
-		logger.Error("Failed to sync static RPZ zone", "zone", rpzOpts.ZoneName, "error", err)
+		logger.Error("Failed to sync RPZ zone to PowerDNS", "zone", rpzOpts.ZoneName, "error", err)
 		return
 	}
 
-	logger.Info("Static RPZ zone synced", "zone", rpzOpts.ZoneName)
+	err = powerdns.SetMetadataAlsoNotify(rpzOpts.ZoneName, alsoNotify)
+	if err != nil {
+		logger.Error("Failed to set also notify for RPZ zone", "zone", rpzOpts.ZoneName, "error", err)
+		return
+	}
+
+	logger.Info("RPZ zone synced", "zone", rpzOpts.ZoneName)
+}
+
+func remoteFileFetcher(url string) func(rpzOpts rpz.Opts) error {
+	return func(rpzOpts rpz.Opts) error {
+		err := rpz.FetchZoneFile(rpzOpts, url)
+		if err != nil {
+			return fmt.Errorf("failed to fetch zone contents from remote %s: %w", url, err)
+		}
+		return nil
+	}
+}
+
+func staticFileBuilder(rules []config.RPZRule) func(rpzOpts rpz.Opts) error {
+	return func(rpzOpts rpz.Opts) error {
+		err := rpz.WriteZoneFileFromRules(rpzOpts, rules)
+		if err != nil {
+			return fmt.Errorf("failed to write zone file %s: %w", rpzOpts.Filename, err)
+		}
+		return nil
+	}
 }
 
 func zoneFileName(dataDir string, zoneName string) string {

@@ -24,6 +24,10 @@ func SyncZoneFromFile(zoneName string, zoneFile string) error {
 	return executePowerDNSCommand("zone", "load", zoneName, zoneFile)
 }
 
+func SetMetadataAlsoNotify(zoneName string, host string) error {
+	return executePowerDNSCommand("metadata", "set", zoneName, "ALSO-NOTIFY", host)
+}
+
 func executePowerDNSCommand(args ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), powerDNSCommandTimeout)
 	defer cancel()
