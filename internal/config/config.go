@@ -3,9 +3,11 @@ package config
 import "fmt"
 
 type Config struct {
-	DataDir string `yaml:"data_dir"`
-	RPZs    []RPZ  `yaml:"rpzs"`
-	DryRun  bool   `yaml:"dry_run"`
+	DataDir         string `yaml:"data_dir"`
+	Nameserver      string `yaml:"nameserver"`
+	HostmasterEmail string `yaml:"hostmaster_email"`
+	RPZs            []RPZ  `yaml:"rpzs"`
+	DryRun          bool   `yaml:"dry_run"`
 }
 
 type RPZType string
@@ -24,8 +26,8 @@ type RPZ struct {
 	URL            string `yaml:"url"`
 	FetchOnStart   bool   `yaml:"fetch_on_start"`
 
-	Rules []RPZRule
-	TTL   int
+	Rules []RPZRule `yaml:"rules"`
+	TTL   int       `yaml:"ttl"`
 }
 
 type RPZAction string

@@ -26,3 +26,13 @@ func Load(configPath string) (*Config, error) {
 
 	return &cfg, nil
 }
+
+func setDefaults(cfg *Config) *Config {
+	for i := range cfg.RPZs {
+		if cfg.RPZs[i].TTL == 0 {
+			cfg.RPZs[i].TTL = 30
+		}
+	}
+
+	return cfg
+}

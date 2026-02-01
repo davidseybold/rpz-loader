@@ -43,12 +43,20 @@ func Run(configPath string) error {
 
 	for _, r := range cfg.RPZs {
 		zoneFile := zoneFileName(cfg.DataDir, r.Name)
+		rpzOpts := rpz.Opts{
+			Filename:        zoneFile,
+			ZoneName:        r.Name,
+			Nameserver:      cfg.Nameserver,
+			HostmasterEmail: cfg.HostmasterEmail,
+			TTL:             r.TTL,
+		}
+
 		if r.Type == string(config.RPZTypeStatic) {
 			_, err = s.NewJob(
 				gocron.OneTimeJob(
 					gocron.OneTimeJobStartDateTime(time.Now().Add(10*time.Second)),
 				),
-				gocron.NewTask(syncStaticRPZ, logger, zoneFile, r.Name, r.TTL, r.Rules),
+				gocron.NewTask(syncStaticRPZ, logger, rpzOpts, r.Rules, cfg.DryRun),
 				gocron.WithName(r.Name),
 			)
 			if err != nil {
@@ -60,7 +68,7 @@ func Run(configPath string) error {
 					gocron.OneTimeJob(
 						gocron.OneTimeJobStartDateTime(time.Now().Add(10*time.Second)),
 					),
-					gocron.NewTask(syncZoneFromRemote, logger, zoneFile, r.Name, r.URL, cfg.DryRun),
+					gocron.NewTask(syncZoneFromRemote, logger, rpzOpts, r.URL, cfg.DryRun),
 					gocron.WithName(r.Name),
 				)
 				if err != nil {
@@ -70,7 +78,7 @@ func Run(configPath string) error {
 
 			_, err = s.NewJob(
 				gocron.CronJob(r.ReloadSchedule, false),
-				gocron.NewTask(syncZoneFromRemote, logger, zoneFile, r.Name, r.URL, cfg.DryRun),
+				gocron.NewTask(syncZoneFromRemote, logger, rpzOpts, r.URL, cfg.DryRun),
 				gocron.WithName(r.Name),
 			)
 			if err != nil {
@@ -126,50 +134,50 @@ func Run(configPath string) error {
 	return g.Run()
 }
 
-func syncZoneFromRemote(logger *slog.Logger, zoneFile string, zoneName string, url string, dryRun bool) {
-	logger.Info("Syncing zone from remote", "zone", zoneName, "url", url)
+func syncZoneFromRemote(logger *slog.Logger, rpzOpts rpz.Opts, url string, dryRun bool) {
+	logger.Info("Syncing zone from remote", "zone", rpzOpts.ZoneName, "url", url)
 
-	err := rpz.FetchZoneFile(zoneFile, zoneName, url)
+	err := rpz.FetchZoneFile(rpzOpts, url)
 	if err != nil {
-		logger.Error("Failed to fetch zone contents from remote", "zone", zoneName, "error", err)
+		logger.Error("Failed to fetch zone contents from remote", "zone", rpzOpts.ZoneName, "error", err)
 		return
 	}
 
 	if dryRun {
-		logger.Info("[DRY RUN] Zone synced from remote", "zone", zoneName)
+		logger.Info("[DRY RUN] Zone synced from remote", "zone", rpzOpts.ZoneName)
 		return
 	}
 
-	err = powerdns.SyncZoneFromFile(zoneName, zoneFile)
+	err = powerdns.SyncZoneFromFile(rpzOpts.ZoneName, rpzOpts.Filename)
 	if err != nil {
-		logger.Error("Failed to sync zone from file to PowerDNS", "zone", zoneName, "error", err)
+		logger.Error("Failed to sync zone from file to PowerDNS", "zone", rpzOpts.ZoneName, "error", err)
 		return
 	}
 
-	logger.Info("Zone synced from remote", "zone", zoneName)
+	logger.Info("Zone synced from remote", "zone", rpzOpts.ZoneName)
 }
 
-func syncStaticRPZ(logger *slog.Logger, zoneFile string, zoneName string, ttl int, rules []config.RPZRule, dryRun bool) {
-	logger.Info("Syncing static RPZ zone", "zone", zoneName)
+func syncStaticRPZ(logger *slog.Logger, rpzOpts rpz.Opts, rules []config.RPZRule, dryRun bool) {
+	logger.Info("Syncing static RPZ zone", "zone", rpzOpts.ZoneName)
 
-	err := rpz.WriteZoneFile(zoneFile, zoneName, ttl, rules)
+	err := rpz.WriteZoneFileFromRules(rpzOpts, rules)
 	if err != nil {
-		logger.Error("Failed to write zone file", "zone", zoneName, "error", err)
+		logger.Error("Failed to write zone file", "zone", rpzOpts.ZoneName, "error", err)
 		return
 	}
 
 	if dryRun {
-		logger.Info("[DRY RUN] Static RPZ zone synced", "zone", zoneName)
+		logger.Info("[DRY RUN] Static RPZ zone synced", "zone", rpzOpts.ZoneName)
 		return
 	}
 
-	err = powerdns.SyncZoneFromFile(zoneName, zoneFile)
+	err = powerdns.SyncZoneFromFile(rpzOpts.ZoneName, rpzOpts.Filename)
 	if err != nil {
-		logger.Error("Failed to sync static RPZ zone", "zone", zoneName, "error", err)
+		logger.Error("Failed to sync static RPZ zone", "zone", rpzOpts.ZoneName, "error", err)
 		return
 	}
 
-	logger.Info("Static RPZ zone synced", "zone", zoneName)
+	logger.Info("Static RPZ zone synced", "zone", rpzOpts.ZoneName)
 }
 
 func zoneFileName(dataDir string, zoneName string) string {
