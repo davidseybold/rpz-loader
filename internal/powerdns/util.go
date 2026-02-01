@@ -20,7 +20,7 @@ func SyncZoneFromFile(zoneName string, zoneFile string) error {
 		return fmt.Errorf("zoneFile is required")
 	}
 
-	return executePowerDNSCommand("load", "zone", zoneName, zoneFile)
+	return executePowerDNSCommand("zone", "load", zoneName, zoneFile)
 }
 
 func executePowerDNSCommand(args ...string) error {
