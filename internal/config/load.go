@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/spf13/viper"
+	"go.yaml.in/yaml/v3"
 )
 
 func Load(configPath string) (*Config, error) {
@@ -12,16 +13,15 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("configPath is required")
 	}
 
-	v := viper.New()
-	v.SetConfigFile(configPath)
-
-	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed reading config file %q: %w", configPath, err)
+	f, err := os.OpenFile(configPath, os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		return nil, err
 	}
 
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed unmarshalling config: %w", err)
+	err = yaml.NewDecoder(f).Decode(&cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	return &cfg, nil

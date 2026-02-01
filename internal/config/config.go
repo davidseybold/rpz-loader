@@ -5,6 +5,7 @@ import "fmt"
 type Config struct {
 	DataDir string `yaml:"data_dir"`
 	RPZs    []RPZ  `yaml:"rpzs"`
+	DryRun  bool   `yaml:"dry_run"`
 }
 
 type RPZType string
