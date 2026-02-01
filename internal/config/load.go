@@ -24,13 +24,30 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
+	cfg = setDefaults(cfg)
+
 	return &cfg, nil
 }
 
-func setDefaults(cfg *Config) *Config {
+func setDefaults(cfg Config) Config {
 	for i := range cfg.RPZs {
 		if cfg.RPZs[i].TTL == 0 {
 			cfg.RPZs[i].TTL = 30
+		}
+		if cfg.RPZs[i].Refresh == 0 {
+			cfg.RPZs[i].Refresh = 3600
+		}
+
+		if cfg.RPZs[i].Retry == 0 {
+			cfg.RPZs[i].Retry = 600
+		}
+
+		if cfg.RPZs[i].NegativeTTL == 0 {
+			cfg.RPZs[i].NegativeTTL = 30
+		}
+
+		if cfg.RPZs[i].Expire == 0 {
+			cfg.RPZs[i].Expire = 604800
 		}
 	}
 

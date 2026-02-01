@@ -49,6 +49,10 @@ func Run(configPath string) error {
 			Nameserver:      cfg.Nameserver,
 			HostmasterEmail: cfg.HostmasterEmail,
 			TTL:             r.TTL,
+			Refresh:         r.Refresh,
+			Retry:           r.Retry,
+			Expire:          r.Expire,
+			NegativeTTL:     r.NegativeTTL,
 		}
 
 		if r.Type == string(config.RPZTypeStatic) {

@@ -26,8 +26,12 @@ type RPZ struct {
 	URL            string `yaml:"url"`
 	FetchOnStart   bool   `yaml:"fetch_on_start"`
 
-	Rules []RPZRule `yaml:"rules"`
-	TTL   int       `yaml:"ttl"`
+	Rules       []RPZRule `yaml:"rules"`
+	TTL         int       `yaml:"ttl"`
+	Refresh     int       `yaml:"refresh"`
+	Retry       int       `yaml:"retry"`
+	Expire      int       `yaml:"expire"`
+	NegativeTTL int       `yaml:"negative_ttl"`
 }
 
 type RPZAction string

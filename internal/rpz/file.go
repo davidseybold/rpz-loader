@@ -20,6 +20,10 @@ type Opts struct {
 	Nameserver      string
 	HostmasterEmail string
 	TTL             int
+	Refresh         int
+	Retry           int
+	Expire          int
+	NegativeTTL     int
 }
 
 func WriteZoneFileFromRules(opts Opts, rules []config.RPZRule) error {
@@ -108,7 +112,7 @@ func isTTLLine(line string) bool {
 }
 
 func writeHeader(w io.Writer, opts Opts) error {
-	serial := time.Now().Format("2006010201")
+	serial := time.Now().Format("200601021504")
 
 	nameserver := addTrailingDot(opts.Nameserver)
 	hostmasterEmail := addTrailingDot(hostmasterEmail(opts.HostmasterEmail))
@@ -124,7 +128,7 @@ func writeHeader(w io.Writer, opts Opts) error {
 		return err
 	}
 
-	_, err = fmt.Fprintf(w, "@ IN SOA %s %s %s 86400 3600 604800 30\n", nameserver, hostmasterEmail, serial)
+	_, err = fmt.Fprintf(w, "@ IN SOA %s %s %s %d %d %d %d\n", nameserver, hostmasterEmail, serial, opts.Refresh, opts.Retry, opts.Expire, opts.NegativeTTL)
 	if err != nil {
 		return err
 	}
