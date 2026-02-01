@@ -176,6 +176,12 @@ func runSync(logger *slog.Logger, buildFile fileBuilder, rpzOpts rpz.Opts, alsoN
 		return
 	}
 
+	err = powerdns.NotifyZone(rpzOpts.ZoneName)
+	if err != nil {
+		logger.Error("Failed to notify RPZ zone", "zone", rpzOpts.ZoneName, "error", err)
+		return
+	}
+
 	logger.Info("RPZ zone synced", "zone", rpzOpts.ZoneName)
 }
 

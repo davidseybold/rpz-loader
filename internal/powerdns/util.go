@@ -21,18 +21,30 @@ func SyncZoneFromFile(zoneName string, zoneFile string) error {
 		return fmt.Errorf("zoneFile is required")
 	}
 
-	return executePowerDNSCommand("zone", "load", zoneName, zoneFile)
+	return executePDNSUtilCommand("zone", "load", zoneName, zoneFile)
 }
 
 func SetMetadataAlsoNotify(zoneName string, host string) error {
-	return executePowerDNSCommand("metadata", "set", zoneName, "ALSO-NOTIFY", host)
+	return executePDNSUtilCommand("metadata", "set", zoneName, "ALSO-NOTIFY", host)
 }
 
-func executePowerDNSCommand(args ...string) error {
+func NotifyZone(zoneName string) error {
+	return executePDNSControlCommand("notify", zoneName)
+}
+
+func executePDNSUtilCommand(args ...string) error {
+	return executeCommand("pdnsutil", args...)
+}
+
+func executePDNSControlCommand(args ...string) error {
+	return executeCommand("pdns_control", args...)
+}
+
+func executeCommand(name string, args ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), powerDNSCommandTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "pdnsutil", args...)
+	cmd := exec.CommandContext(ctx, name, args...)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -55,12 +67,12 @@ func executePowerDNSCommand(args ...string) error {
 	}
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return fmt.Errorf("pdnsutil %s timed out after %s%s", strings.Join(args, " "), powerDNSCommandTimeout, outputDetails)
+		return fmt.Errorf("%s %s timed out after %s%s", name, strings.Join(args, " "), powerDNSCommandTimeout, outputDetails)
 	}
 
 	if exitErr, ok := err.(*exec.ExitError); ok {
-		return fmt.Errorf("pdnsutil %s exited with code %d%s", strings.Join(args, " "), exitErr.ExitCode(), outputDetails)
+		return fmt.Errorf("%s %s exited with code %d%s", name, strings.Join(args, " "), exitErr.ExitCode(), outputDetails)
 	}
 
-	return fmt.Errorf("pdnsutil %s failed: %w%s", strings.Join(args, " "), err, outputDetails)
+	return fmt.Errorf("%s %s failed: %w%s", name, strings.Join(args, " "), err, outputDetails)
 }
