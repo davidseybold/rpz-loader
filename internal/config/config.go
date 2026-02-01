@@ -21,6 +21,7 @@ type RPZ struct {
 
 	ReloadSchedule string `yaml:"reload_schedule"`
 	URL            string `yaml:"url"`
+	FetchOnStart   bool   `yaml:"fetch_on_start"`
 
 	Rules []RPZRule
 	TTL   int

@@ -25,9 +25,6 @@ func Run(configPath string) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
-		return err
-	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -58,6 +55,19 @@ func Run(configPath string) error {
 				return err
 			}
 		} else {
+			if r.FetchOnStart {
+				_, err = s.NewJob(
+					gocron.OneTimeJob(
+						gocron.OneTimeJobStartDateTime(time.Now().Add(10*time.Second)),
+					),
+					gocron.NewTask(syncZoneFromRemote, logger, zoneFile, r.Name, r.URL),
+					gocron.WithName(r.Name),
+				)
+				if err != nil {
+					return err
+				}
+			}
+
 			_, err = s.NewJob(
 				gocron.CronJob(r.ReloadSchedule, false),
 				gocron.NewTask(syncZoneFromRemote, logger, zoneFile, r.Name, r.URL),
@@ -111,17 +121,7 @@ func Run(configPath string) error {
 		)
 	}
 
-	{
-		exec, interrupt := run.SignalHandler(context.Background(), os.Interrupt, syscall.SIGTERM)
-		g.Add(
-			func() error {
-				err := exec()
-				logger.Info("shutdown requested", "error", err)
-				return err
-			},
-			interrupt,
-		)
-	}
+	g.Add(run.SignalHandler(context.Background(), os.Interrupt, syscall.SIGTERM))
 
 	return g.Run()
 }
