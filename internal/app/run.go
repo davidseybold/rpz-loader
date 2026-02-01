@@ -36,7 +36,7 @@ func Run(configPath string) error {
 		Handler: mux,
 	}
 
-	s, err := gocron.NewScheduler(gocron.WithMonitor(metrics.NewPrometheusMonitor()))
+	s, err := gocron.NewScheduler(gocron.WithMonitor(metrics.NewPrometheusMonitor()), gocron.WithLimitConcurrentJobs(1, gocron.LimitModeWait))
 	if err != nil {
 		return err
 	}
