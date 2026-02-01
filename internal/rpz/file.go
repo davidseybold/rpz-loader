@@ -128,7 +128,7 @@ func writeHeader(w io.Writer, opts Opts) error {
 		return err
 	}
 
-	_, err = fmt.Fprintf(w, "@ IN SOA %s %s %s %d %d %d %d\n", nameserver, hostmasterEmail, serial, opts.Refresh, opts.Retry, opts.Expire, opts.NegativeTTL)
+	_, err = fmt.Fprintf(w, "@ IN SOA %s %s %d %d %d %d %d\n", nameserver, hostmasterEmail, serial, opts.Refresh, opts.Retry, opts.Expire, opts.NegativeTTL)
 	if err != nil {
 		return err
 	}
