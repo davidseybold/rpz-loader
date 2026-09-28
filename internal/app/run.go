@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -92,7 +93,12 @@ func Run(configPath string) error {
 
 	g.Add(run.SignalHandler(context.Background(), os.Interrupt, syscall.SIGTERM))
 
-	return g.Run()
+	// A stop signal is a normal shutdown (exit 0), not a failure for systemd to record.
+	if err := g.Run(); err != nil && !errors.Is(err, run.ErrSignal) {
+		return err
+	}
+	logger.Info("stopped")
+	return nil
 }
 
 func addJobs(s gocron.Scheduler, cfg *config.Config, logger *slog.Logger, sy *syncer) error {
