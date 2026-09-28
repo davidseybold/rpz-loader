@@ -26,12 +26,18 @@ Example `config.yaml`:
 
 ```yaml
 data_dir: /var/lib/rpz-loader
+nameserver: ns1.example.internal         # SOA/NS name of the generated zones
+hostmaster_email: hostmaster@example.internal
+also_notify:                             # notified after every load (a list, or one host)
+  - 192.168.5.21:53
 
 rpzs:
   - name: example-rpz
     type: managed
     reload_schedule: "*/5 * * * *" # cron
     url: "https://example.com/example-rpz.zone"
+    min_rules: 1000          # reject a download with fewer rules (default 1)
+    max_shrink_percent: 50   # reject one this much smaller than the last good one (default 50; 100 = off)
 
   - name: static-rpz
     type: static
@@ -44,7 +50,13 @@ rpzs:
 
 ### Notes
 
-- `data_dir` is where fetched/generated zone files are written.
+- `data_dir` is where fetched/generated zone files are written. Files are replaced
+  atomically, and only after a download passes its checks.
+- Unknown keys are errors, so a misspelled key can't be ignored silently.
+- A managed download is rejected, and the zone already loaded in PowerDNS is kept, when
+  it is an HTML page, has fewer than `min_rules` rules, or has shrunk by more than
+  `max_shrink_percent` since the last good one (read from the zone file after a restart).
+- A failed sync (download, check, or PowerDNS) is reported as `result="fail"`.
 - For managed RPZs, `reload_schedule` must be a valid cron expression.
 - For static RPZs, `ttl` and `rules` are required.
 
@@ -57,8 +69,11 @@ Prometheus metrics are exposed at:
 
 Metrics include:
 
-- `rpz_loader_zone_reload_total{zone,result}`
+- `rpz_loader_zone_reload_total{zone,result}`: `result` is `success` or `fail`
 - `rpz_loader_zone_reload_duration_seconds{zone}`
+- `rpz_loader_zone_last_success_timestamp_seconds{zone,type}`: when the zone was last
+  loaded. Static zones load only at start, so alert on staleness with `type="managed"`.
+- `rpz_loader_zone_rules{zone,type}`: rules in the zone as last loaded
 
 
 ## Development
@@ -69,7 +84,7 @@ Add/refresh dependencies:
 go mod tidy
 ```
 
-Build:
+Test:
 
 ```bash
 go test ./...

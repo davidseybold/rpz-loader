@@ -24,8 +24,9 @@ func SyncZoneFromFile(zoneName string, zoneFile string) error {
 	return executePDNSUtilCommand("zone", "load", zoneName, zoneFile)
 }
 
-func SetMetadataAlsoNotify(zoneName string, host string) error {
-	return executePDNSUtilCommand("metadata", "set", zoneName, "ALSO-NOTIFY", host)
+// SetMetadataAlsoNotify sets the hosts PowerDNS notifies when the zone changes.
+func SetMetadataAlsoNotify(zoneName string, hosts []string) error {
+	return executePDNSUtilCommand(append([]string{"metadata", "set", zoneName, "ALSO-NOTIFY"}, hosts...)...)
 }
 
 func NotifyZone(zoneName string) error {

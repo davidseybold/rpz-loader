@@ -18,8 +18,13 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
+	defer f.Close()
+
+	// Unknown keys are errors: a misspelled key would otherwise be ignored silently.
+	dec := yaml.NewDecoder(f)
+	dec.KnownFields(true)
 	var cfg Config
-	err = yaml.NewDecoder(f).Decode(&cfg)
+	err = dec.Decode(&cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +53,14 @@ func setDefaults(cfg Config) Config {
 
 		if cfg.RPZs[i].Expire == 0 {
 			cfg.RPZs[i].Expire = 604800
+		}
+
+		if cfg.RPZs[i].MinRules == 0 {
+			cfg.RPZs[i].MinRules = 1
+		}
+
+		if cfg.RPZs[i].MaxShrinkPercent == 0 {
+			cfg.RPZs[i].MaxShrinkPercent = 50
 		}
 	}
 
